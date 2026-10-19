@@ -1,0 +1,1 @@
+export function isTrustedFrame(url,isMainFrame){try{const u=new URL(url);return isMainFrame===true&&u.protocol==='app:'&&u.hostname==='localhost'&&!u.username&&!u.password&&!u.port;}catch{return false;}}

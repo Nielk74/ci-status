@@ -1,0 +1,22 @@
+{
+  "name": "signal-ci-mod",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An extensible CI/CD status framework for Claude Desktop mods.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node scripts/preview.mjs",
+    "dev": "node scripts/preview.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "prepare:demo": "npm run build && node scripts/prepare-framework-demo.mjs",
+    "demo:framework": "node scripts/run-framework-demo.mjs --show",
+    "demo:upstream": "node scripts/mock-upstream.mjs",
+    "test:desktop": "node scripts/run-framework-demo.mjs --test",
+    "stage:desktop": "node scripts/stage-desktop.mjs",
+    "install:desktop": "node scripts/install-desktop.mjs",
+    "restore:desktop": "node scripts/install-desktop.mjs --restore"
+  },
+  "devDependencies": { "esbuild": "^0.25.0" }
+}

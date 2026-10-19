@@ -1,0 +1,42 @@
+{
+  "mode": "live",
+  "pollIntervalMs": 30000,
+  "sources": [
+    {
+      "id": "website-ci",
+      "name": "Website CI",
+      "provider": "github",
+      "owner": "acme",
+      "repo": "website",
+      "branch": "main"
+    },
+    {
+      "id": "api-ci",
+      "name": "API pipeline",
+      "provider": "bitbucket",
+      "workspace": "acme",
+      "repo": "api",
+      "branch": "main",
+      "tokenEnv": "BITBUCKET_TOKEN",
+      "authScheme": "bearer"
+    },
+    {
+      "id": "release",
+      "name": "Release build",
+      "provider": "teamcity",
+      "url": "https://ci.example.com/teamcity",
+      "buildType": "Website_Release",
+      "branch": "main",
+      "tokenEnv": "TEAMCITY_TOKEN"
+    },
+    {
+      "id": "payments",
+      "name": "Payments API",
+      "provider": "http",
+      "url": "https://api.example.com/health",
+      "expectedStatus": 200,
+      "jsonPath": "service.status",
+      "expectedValue": "ok"
+    }
+  ]
+}

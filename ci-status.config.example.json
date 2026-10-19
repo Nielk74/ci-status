@@ -1,0 +1,8 @@
+{
+  "mode": "live",
+  "pollIntervalMs": 30000,
+  "sources": [
+    { "id": "website-ci", "name": "Website CI", "provider": "github", "owner": "acme", "repo": "website", "branch": "main" },
+    { "id": "api", "name": "Local API", "provider": "http", "url": "http://127.0.0.1:3000/health", "expectedStatus": 200, "jsonPath": "status", "expectedValue": "ok" }
+  ]
+}

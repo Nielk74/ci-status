@@ -1,0 +1,13 @@
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const project=fileURLToPath(new URL('../',import.meta.url)),configFile=path.join(project,'ci-status.config.json');
+const common={absWorkingDir:project,bundle:true,target:'es2022',legalComments:'none',minify:true};
+await fs.mkdir(path.join(project,'dist/desktop'),{recursive:true});
+await build({...common,entryPoints:['src/ui/app.mjs'],outfile:'dist/badge.js',format:'esm',platform:'browser'});
+await build({...common,entryPoints:['src/desktop/main.mjs'],outfile:'dist/desktop/main.cjs',format:'cjs',platform:'node',external:['electron'],define:{__SIGNAL_CONFIG_FILE__:JSON.stringify(configFile)}});
+await build({...common,entryPoints:['src/desktop/renderer.mjs'],outfile:'dist/desktop/renderer.js',format:'iife',platform:'browser',loader:{'.css':'text'}});
+await fs.copyFile(path.join(project,'src/desktop/preload.cjs'),path.join(project,'dist/desktop/preload.cjs'));
+await fs.copyFile(path.join(project,'src/ui/styles.css'),path.join(project,'dist/badge.css'));
+console.log('Built the CI badge and Desktop bridge.');

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.local/
+.npm-cache/
+ci-status.config.json
+docs/images/*.png
+docs/progress.md
+docs/superpowers/
