@@ -1,0 +1,19 @@
+{
+  "mode": "live",
+  "pollIntervalMs": 30000,
+  "sources": [
+    {"id": "api", "name": "Shared API", "provider": "http", "url": "https://api.example.com/health", "expectedStatus": 200, "valuePath": "latencyMs"},
+    {"id": "website-ci", "name": "Website build", "provider": "github", "owner": "acme", "repo": "website", "branch": "main"}
+  ],
+  "badges": [
+    {"id": "shared-api", "label": "Latency", "scope": "global", "sourceIds": ["api"], "display": {"type": "value", "sourceId": "api", "suffix": " ms"}},
+    {
+      "id": "website-build", "label": "Build", "scope": "project", "sourceIds": ["website-ci"],
+      "project": {"kind": "folder", "id": "C:/work/website", "name": "Website"}
+    },
+    {
+      "id": "website-release", "label": "Release", "scope": "project", "sourceIds": ["website-ci"],
+      "project": {"kind": "claude", "id": "your-project-id", "name": "Website project"}
+    }
+  ]
+}

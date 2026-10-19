@@ -41,6 +41,25 @@ npm start
 
 Installed Claude must inherit the variable when it starts. Never paste a token into the URL or source configuration. Bitbucket access tokens use **Bearer**; API tokens use **Basic**, with `base64(email:token)` as the variable’s value.
 
+## Multiple badges and projects
+
+Open a badge → **Badges → Add badge**. Choose a **Label**, its **Sources**, and **Visible in**:
+
+- **Everywhere**: a common badge shown in any project.
+- **One project**: a Claude Code folder or Claude Project. **Use current project** fills it in when detected; you can also enter the full folder path or Claude project URL/ID.
+
+For example, keep **API · Passed** everywhere and show **Build · 1 running** only in your Website project. Sources are configured once and can be shared by badges. Open **Badges** to edit or remove a badge, including ones hidden in the current project.
+
+Folder and project changes update visibility automatically when Claude exposes their identity. Full folder paths must match; equal folder names in different locations are separate projects. If automatic detection is unavailable, use **Badges → Project context** to select the project for this page. Manual selection resets on navigation. If no project is known, only common badges appear.
+
+Copy [examples/scoped-badges.json](../examples/scoped-badges.json) for a complete configuration. Replace the example endpoints, repository, folder and project ID. Omit `badges` to retain the original combined CI badge; use `badges: []` to hide status badges while keeping the **Badges** settings button. Omit a badge’s `sourceIds` to include all current and future sources.
+
+## Values and metrics
+
+A badge can show **Latency · 48 ms**, **Queue · 12**, or a version string. For an HTTP source, open its settings → **JSON fields → Value property path** and enter a path such as `metrics.latencyMs`. This extracts a number or short text from the endpoint’s JSON response.
+
+Then open **Badges**, edit the badge, and choose **Display → Source value / metric**. Select the value source and optional prefix/suffix, such as ` ms`. The status icon/color remains, and failed or stale checks display their state instead of an old value. A missing value displays **—**. Custom providers can return `value` directly; see the [extension guide](EXTENDING.md). The [scoped example](../examples/scoped-badges.json) includes a common latency badge.
+
 ## Configuration examples
 
 The UI saves `ci-status.config.json` in the project folder. For manual configuration, put source objects inside `sources`:

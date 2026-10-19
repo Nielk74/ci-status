@@ -1,9 +1,11 @@
 import {mountBadge} from '../ui/app.mjs';
 import styles from '../ui/styles.css';
+import {observeProjects} from './project.mjs';
 if(!document.getElementById('signal-ci-badge-host')&&window.signalCI?.request){
  const host=document.createElement('span');host.id='signal-ci-badge-host';host.style.cssText='display:inline-block;position:relative;vertical-align:middle;-webkit-app-region:no-drag';
  const shadow=host.attachShadow({mode:'open'}),style=document.createElement('style'),root=document.createElement('span');style.textContent=styles;shadow.append(style,root);
  const badge=mountBadge(root,{request:window.signalCI.request});let disposed=false,scheduled=false;
+ const stopProjects=observeProjects(window,document,(projects,options)=>badge.setContext(projects,options));
  function attach(){
   scheduled=false;if(disposed)return;
   for(const duplicate of document.querySelectorAll('#signal-ci-badge-host'))if(duplicate!==host)duplicate.remove();
@@ -15,5 +17,5 @@ if(!document.getElementById('signal-ci-badge-host')&&window.signalCI?.request){
   host.hidden=false;if(host.parentElement!==composer){host.style.margin='0 10px 8px';composer.append(host);}
  }
  const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(attach);});observer.observe(document.body,{childList:true,subtree:true});attach();
- window.addEventListener('pagehide',()=>{disposed=true;observer.disconnect();badge.destroy();host.remove();},{once:true});
+ window.addEventListener('pagehide',()=>{disposed=true;observer.disconnect();stopProjects();badge.destroy();host.remove();},{once:true});
 }

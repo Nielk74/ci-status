@@ -10,7 +10,7 @@ export function createStatusService({registry,config,configFile,now=Date.now}={}
   const demo=createDemoProvider({now});registry??=createProviderRegistry([createGitHubProvider(),createBitbucketProvider(),createTeamCityProvider(),createHttpProvider(),demo]);
   let settings=config?validateConfig(config):defaultConfig(),loaded=!!config,revision=0,inflight=null,last=null,previous=new Map(),writes=Promise.resolve();
   async function load(){if(!loaded){settings=await readConfig(configFile);loaded=true;}}
-  function envelope(runs,sources,errors,mode=settings.mode){return {mode,runs,sources,errors,summary:summarize(runs),updatedAt:new Date(now()).toISOString(),pollIntervalMs:mode==='demo'?5000:settings.pollIntervalMs};}
+  function envelope(runs,sources,errors,mode=settings.mode){return {mode,runs,sources,errors,badges:structuredClone(settings.badges),summary:summarize(runs),updatedAt:new Date(now()).toISOString(),pollIntervalMs:mode==='demo'?5000:settings.pollIntervalMs};}
   async function refresh(force=false){
     await load();
     if(settings.mode==='demo'){

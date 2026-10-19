@@ -11,6 +11,8 @@ const routes=new Map([
   ['/ui/icons.mjs',['./ui/icons.mjs','text/javascript; charset=utf-8']],
   ['/ui/styles.css',['./ui/styles.css','text/css; charset=utf-8']],
   ['/core/model.mjs',['./core/model.mjs','text/javascript; charset=utf-8']],
+  ['/core/badges.mjs',['./core/badges.mjs','text/javascript; charset=utf-8']],
+  ['/desktop/project.mjs',['./desktop/project.mjs','text/javascript; charset=utf-8']],
   ['/core/presentation.mjs',['./core/presentation.mjs','text/javascript; charset=utf-8']]
 ]);
 export async function createPreviewServer({port=4319,service=createStatusService({configFile:fileURLToPath(new URL('../ci-status.config.json',import.meta.url))})}={}){

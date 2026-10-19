@@ -9,7 +9,7 @@ export async function createMockCiServer({port=0}={}){
     res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');
     if(url.pathname==='/health'){
       res.statusCode=['failed','offline'].includes(scenario)?503:200;
-      res.end(JSON.stringify({status:res.statusCode===200?'ok':'down'}));return;
+      res.end(JSON.stringify({status:res.statusCode===200?'ok':'down',latencyMs:scenario==='building'?80:48}));return;
     }
     if(url.pathname==='/teamcity/app/rest/builds'){
       if(scenario==='offline'){res.writeHead(503);res.end(JSON.stringify({error:'Mock TeamCity unavailable'}));return;}

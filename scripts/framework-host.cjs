@@ -29,12 +29,80 @@ async function verify(){
     console.log('[framework check] '+scenario+' -> '+expected);
   }
   // Recreate the host composer, as Claude does during navigation.
-  await read('document.querySelector(".preview-composer").outerHTML=document.querySelector(".preview-composer").outerHTML');
+  // Model the host restoring its own draft after recreating the composer DOM.
+  await read('(()=>{const composer=document.querySelector(".preview-composer"),draft=composer.querySelector("textarea").value;composer.outerHTML=composer.outerHTML;document.querySelector("textarea").value=draft;})()');
   await waitFor('!!document.querySelector("[data-signal-ci-slot] #signal-ci-badge-host")?.shadowRoot?.querySelector(".ci-badge")',true);
   assert.equal(await read('document.querySelectorAll("#signal-ci-badge-host").length'),1);report.checks.push('Badge reattaches when the host composer is recreated, with one functional shadow root.');
   const untrusted=new BrowserWindow({show:false,webPreferences:{preload:path.join(project,'dist/desktop/preload.cjs'),sandbox:true,contextIsolation:true}});
   await untrusted.loadURL('data:text/html,<p>Untrusted frame test</p>');const denied=await untrusted.webContents.executeJavaScript('window.signalCI.request({action:"snapshot"})');assert.equal(denied.ok,false);untrusted.destroy();report.checks.push('Production IPC rejects an untrusted page.');
   await read(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")==="true"&&'+selector+'.querySelector(".ci-badge").click()');
+  const badges=[
+    {id:'api',label:'API',scope:'global',sourceIds:['mock-api']},
+    {id:'build',label:'Build',scope:'project',sourceIds:['mock-build'],project:{kind:'folder',id:'C:/work/website',name:'Website'}},
+    {id:'other',label:'Other',scope:'project',sourceIds:['mock-build'],project:{kind:'folder',id:'C:/work/other',name:'Other'}},
+    {id:'release',label:'Release',scope:'project',sourceIds:['mock-build'],project:{kind:'claude',id:'project-one',name:'Website project'}}
+  ];
+  const result=await read('window.signalCI.request('+JSON.stringify({action:'config.set',args:{...upstream.config,badges}})+')');assert.equal(result.ok,true);
+  const badgeIds=selector+'&&Array.from('+selector+'.querySelectorAll(".ci-badge")).map(n=>n.dataset.badgeId).join(",")';
+  await read('(()=>{const n=document.createElement("button");n.id="native-folder-context";n.dataset.testid="draft-rail-folder";n.title="C:/work/website";n.textContent="website";document.querySelector(".preview-toolbar").append(n);history.pushState({},"","/code/session-one");})()');
+  await waitFor(badgeIds,'api,build');assert.equal(await read(selector+'.querySelectorAll(".ci-badge")[1].getBoundingClientRect().height'),26);
+  await capture('project-badges');report.checks.push('A common API badge and exact-folder Build badge appear together at the original 26px height.');
+  await read('document.getElementById("native-folder-context").title="C:/other/website"');await waitFor(badgeIds,'api',2000);
+  await read('document.getElementById("native-folder-context").title="C:/work/other"');await waitFor(badgeIds,'api,other',2000);
+  report.checks.push('Changing the native primary folder immediately switches scoped badges; equal folder basenames do not match.');
+  await read('document.getElementById("native-folder-context").remove();history.pushState({},"","/project/project-one")');await waitFor(badgeIds,'api,release',2000);
+  await read('history.pushState({},"","/project/project-two")');await waitFor(badgeIds,'api',2000);
+  report.checks.push('Claude project routes show only the matching project badge; common badges remain visible.');
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  await read(selector+'.querySelector("[data-action=manage]").click()');await waitFor('!!'+selector+'?.querySelector("select[name=projectContext]")',true);
+  await read('(()=>{const s='+selector+'.querySelector("select[name=projectContext]");s.value=Array.from(s.options).find(o=>o.textContent.includes("Website")&&o.textContent.includes("folder")).value;s.dispatchEvent(new Event("change",{bubbles:true}));})()');await waitFor(badgeIds,'api,build',2000);
+  await read('history.pushState({},"","/chat/another-conversation")');await waitFor(badgeIds,'api',2000);
+  report.checks.push('Manual project context works when needed and clears on navigation.');
+  await read('(()=>{const n=document.createElement("button");n.id="native-folder-context";n.dataset.testid="draft-rail-folder";n.title="C:/work/website";n.textContent="website";document.querySelector(".preview-toolbar").append(n);})()');await waitFor(badgeIds,'api,build',2000);
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  await read(selector+'.querySelector("[data-action=manage]").click()');await waitFor('!!'+selector+'?.querySelector("[data-action=new-badge]")',true);
+  await read(selector+'.querySelector("[data-action=new-badge]").click()');await waitFor('!!'+selector+'?.querySelector("input[name=label]")',true);
+  await read('(()=>{const s='+selector+';const set=(name,value)=>{const n=s.querySelector("[name="+name+"]");n.value=value;n.dispatchEvent(new Event("input",{bubbles:true}));};set("label","Checks");set("scope","project");set("sourceMode","selected");const c=s.querySelector("input[name=sourceIds][value=mock-api]");c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}));s.querySelector("form").requestSubmit();})()');
+  await waitFor(selector+'&&Array.from('+selector+'.querySelectorAll(".ci-badge b")).map(n=>n.textContent).join(",")','API,Build,Checks');
+  const saved=await read('window.signalCI.request({action:"config.get"})');const added=saved.value.badges.find(b=>b.label==='Checks');assert.equal(added.project.id,'C:/work/website');assert.deepEqual(added.sourceIds,['mock-api']);
+  await read('document.getElementById("native-folder-context").title="C:/work/other"');await waitFor(badgeIds,'api,other',2000);
+  await read('document.getElementById("native-folder-context").title="C:/work/website"');await waitFor(badgeIds,'api,build,'+added.id,2000);
+  report.checks.push('The compact editor creates and persists a named badge, selected source and current-project visibility.');
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  const editBadgeSelector=JSON.stringify('[data-action=edit-badge][data-id="'+added.id+'"]');
+  await read(selector+'.querySelector("[data-action=manage]").click()');await waitFor('!!'+selector+'?.querySelector('+editBadgeSelector+')',true);
+  await read(selector+'.querySelector('+editBadgeSelector+').click()');await waitFor('!!'+selector+'?.querySelector("[data-action=remove]")',true);
+  await read(selector+'.querySelector("[data-action=remove]").click()');await waitFor(badgeIds,'api,build');
+  await read(selector+'.querySelector("[data-action=close]").click()');report.checks.push('Badges can be edited and removed from the same compact settings popover.');
+  upstream.setScenario('offline');await waitFor(selector+'?.querySelector("[data-badge-id=build]")?.getAttribute("aria-label")','Build status: Stale');
+  assert.equal(await read(selector+'.querySelector("[data-badge-id=api]").getAttribute("aria-label")'),'API status: 1 failed');
+  upstream.setScenario('success');await waitFor(selector+'?.querySelector("[data-badge-id=build]")?.getAttribute("aria-label")','Build status: Passed');
+  assert.equal(await read('document.querySelector("textarea").value'),'Draft remains intact while CI updates');
+  report.checks.push('Independent badges isolate upstream errors and recover through shared polling without touching the prompt.');
+  await capture('project-badges-recovered');
+  // Configure a metric through the actual source and badge editors.
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  await read(selector+'.querySelector("[data-action=manage]").click()');await waitFor('!!'+selector+'?.querySelector("[data-action=edit][data-id=mock-api]")',true);
+  await read(selector+'.querySelector("[data-action=edit][data-id=mock-api]").click()');await waitFor('!!'+selector+'?.querySelector("input[name=valuePath]")',true);
+  await read('(()=>{const s='+selector+',n=s.querySelector("input[name=valuePath]");n.value="latencyMs";n.dispatchEvent(new Event("input",{bubbles:true}));s.querySelector("form").requestSubmit();})()');
+  await waitFor('!!'+selector+'?.querySelector("[data-action=edit-badge][data-id=api]")',true);
+  await read(selector+'.querySelector("[data-action=edit-badge][data-id=api]").click()');await waitFor('!!'+selector+'?.querySelector("input[name=label]")',true);
+  await read('(()=>{const s='+selector+';const set=(name,value)=>{const n=s.querySelector("[name="+name+"]");n.value=value;n.dispatchEvent(new Event("input",{bubbles:true}));};set("label","Latency");set("displayType","value");set("valueSuffix"," ms");s.querySelector("form").requestSubmit();})()');
+  const metricLabel=selector+'?.querySelector("[data-badge-id=api]")?.getAttribute("aria-label")';
+  await waitFor(metricLabel,'Latency value: 48 ms; status: Passed');
+  const metricSettings=await read('window.signalCI.request({action:"config.get"})');assert.equal(metricSettings.value.sources.find(s=>s.id==='mock-api').valuePath,'latencyMs');assert.equal(metricSettings.value.badges.find(b=>b.id==='api').display.suffix,' ms');
+  report.checks.push('The real source and badge editors persist a JSON metric and unit suffix; the badge displays 48 ms with an accessible health status.');
+  upstream.setScenario('building');await waitFor(metricLabel,'Latency value: 80 ms; status: Passed');
+  upstream.setScenario('failed');await waitFor(metricLabel,'Latency status: 1 failed');
+  upstream.setScenario('success');await waitFor(metricLabel,'Latency value: 48 ms; status: Passed');
+  report.checks.push('Shared polling updates metric values and replaces failed metrics with their failure status.');
+  await read(selector+'.querySelector("[data-action=close]").click()');
+  window.setContentSize(375,780);await delay(150);
+  assert.equal(await read('Array.from('+selector+'.querySelectorAll(".ci-badge")).every(n=>{const r=n.getBoundingClientRect();return r.height===26&&r.left>=0&&r.right<=innerWidth;})'),true);
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  assert.equal(await read('(()=>{const r='+selector+'.querySelector(".ci-popover").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1;})()'),true);
+  await capture('metrics-narrow');window.setContentSize(1100,780);await delay(100);await capture('metrics-badges');
+  report.checks.push('Multiple metric/status badges and their popover fit a 375px viewport at the original 26px height.');
   await saveReport();console.log('[framework check] PASS '+report.checks.length+' native integration checks.');
 }
 app.whenReady().then(async()=>{
