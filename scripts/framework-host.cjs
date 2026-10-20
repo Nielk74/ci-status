@@ -8,15 +8,52 @@ let upstream,window,autoplay;const report={checks:[],screenshots:[],errors:[]};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const selector='document.querySelector("#signal-ci-badge-host")?.shadowRoot';
 async function read(expression){return window.webContents.executeJavaScript(expression);}
-async function waitFor(expression,expected,timeout=20000){const start=Date.now();while(Date.now()-start<timeout){const value=await read(expression);if(value===expected)return;await delay(150);}throw new Error('Timed out waiting for '+expected+'; last value '+await read(expression));}
+// Allow a full 15s poll interval plus the providers' 10s request timeout.
+async function waitFor(expression,expected,timeout=30000){const start=Date.now();while(Date.now()-start<timeout){const value=await read(expression);if(value===expected)return;await delay(150);}throw new Error('Timed out waiting for '+expected+'; last value '+await read(expression));}
 async function capture(name){const file=path.join(root,name+'.png');await fs.writeFile(file,(await window.webContents.capturePage()).toPNG());report.screenshots.push(file);}
 async function saveReport(){await fs.writeFile(path.join(root,'report.json'),JSON.stringify({...report,requests:upstream?.requests},null,2)+'\n','utf8');}
+async function verifySelects(){
+  // Claude's composer cancels bubbling mousedown events to retain editor focus.
+  await read('window.__cancelComposerMouseDown=e=>e.preventDefault();document.querySelector(".preview-composer").addEventListener("mousedown",window.__cancelComposerMouseDown)');
+  window.show();window.focus();window.webContents.focus();
+  async function choose(name,value){
+    const css=JSON.stringify('select[name="'+name+'"]');
+    const point=await read('(()=>{const n='+selector+'.querySelector('+css+');n.scrollIntoView({block:"nearest"});const r=n.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()');
+    window.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});
+    window.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});
+    await waitFor(selector+'?.querySelector('+css+')?.matches(":open")',true,2000);
+    const index=await read('Array.from('+selector+'.querySelector('+css+').options).findIndex(n=>n.value==='+JSON.stringify(value)+')');
+    assert.ok(index>=0,'expected select option exists');
+    for(const key of ['Home',...Array(index).fill('Down'),'Return']){
+      window.webContents.sendInputEvent({type:'keyDown',keyCode:key});
+      window.webContents.sendInputEvent({type:'keyUp',keyCode:key});
+    }
+    await waitFor(selector+'?.querySelector('+css+')?.value',value,2000);
+    assert.equal(await read('!!'+selector+'.querySelector(".ci-popover:not([hidden])")'),true);
+  }
+  try{
+    await read(selector+'.querySelector("[data-action=manage]").click()');await waitFor('!!'+selector+'?.querySelector("[data-action=new-badge]")',true);
+    await read(selector+'.querySelector("[data-action=new-badge]").click()');await waitFor('!!'+selector+'?.querySelector("select[name=scope]")',true);
+    await choose('scope','project');await choose('projectKind','claude');await choose('sourceMode','selected');await choose('displayType','value');
+    assert.equal(await read('!!'+selector+'.querySelector("input[name=projectId]")&&!!'+selector+'.querySelector("input[name=sourceIds]")&&!!'+selector+'.querySelector("select[name=valueSourceId]")'),true);
+    await read(selector+'.querySelector("[data-action=cancel]").click()');
+    await read(selector+'.querySelector("[data-action=add]").click()');await waitFor('!!'+selector+'?.querySelector("select[name=provider]")',true);
+    await choose('provider','http');assert.equal(await read('!!'+selector+'.querySelector("input[name=expectedStatus]")'),true);
+    await read(selector+'.querySelector("[data-action=cancel]").click()');await read(selector+'.querySelector("[data-action=close]").click()');
+    report.checks.push('Native dropdowns open with real mouse input and select options by keyboard inside a composer that cancels mousedown; badge and source fields update.');
+  }finally{
+    await read('document.querySelector(".preview-composer").removeEventListener("mousedown",window.__cancelComposerMouseDown);delete window.__cancelComposerMouseDown');
+  }
+}
 async function verify(){
   const label=selector+'?.querySelector(".ci-badge")?.getAttribute("aria-label")';
   await waitFor(label,'CI status: 1 running');report.checks.push('Production renderer mounted via production preload and trusted app:// IPC.');
   assert.equal(await read(selector+'.querySelector(".ci-badge").getBoundingClientRect().height'),26);
   await read('document.querySelector("textarea").value="Draft remains intact while CI updates"');
   await read(selector+'.querySelector(".ci-badge").click()');
+  await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
+  await verifySelects();
+  await read(selector+'.querySelector(".ci-badge").click()');await waitFor(selector+'?.querySelector(".ci-badge")?.getAttribute("aria-expanded")','true');
   await read(selector+'.querySelector(".ci-run").click()');
   await waitFor(selector+'?.querySelector("[role=progressbar]")?.getAttribute("aria-valuenow")','35');
   await capture('running');report.checks.push('Real TeamCity adapter supplies repository, branch and 35% progress.');

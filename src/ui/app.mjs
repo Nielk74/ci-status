@@ -203,7 +203,10 @@ export function mountBadge(root,{request,context=[]}={}){
   }
   function key(event){if(event.key==='Escape'){++viewRevision;open=false;editing=null;render();root.querySelector('.ci-badge,.ci-manage')?.focus();}}
   const outside=event=>{if(open&&!event.composedPath().includes(root)){++viewRevision;open=false;editing=null;render();}};
-  root.addEventListener('click',click);root.addEventListener('input',change);root.addEventListener('change',change);root.addEventListener('submit',submit);root.addEventListener('keydown',key);document.addEventListener('pointerdown',outside);
+  // The host composer cancels bubbling mousedown to keep focus in its editor.
+  // Keep native controls' default focus/picker behavior inside our widget.
+  const mouseDown=event=>event.stopPropagation();
+  root.addEventListener('mousedown',mouseDown);root.addEventListener('click',click);root.addEventListener('input',change);root.addEventListener('change',change);root.addEventListener('submit',submit);root.addEventListener('keydown',key);document.addEventListener('pointerdown',outside);
   render();void call('config.get').then(c=>{if(stopped)return;config=c;return refresh();}).catch(x=>{error=x.message;if(!stopped)render();});
-  return {refresh,setContext,destroy(){stopped=true;generation++;viewRevision++;clearTimeout(timer);root.removeEventListener('click',click);root.removeEventListener('input',change);root.removeEventListener('change',change);root.removeEventListener('submit',submit);root.removeEventListener('keydown',key);document.removeEventListener('pointerdown',outside);root.replaceChildren();}};
+  return {refresh,setContext,destroy(){stopped=true;generation++;viewRevision++;clearTimeout(timer);root.removeEventListener('mousedown',mouseDown);root.removeEventListener('click',click);root.removeEventListener('input',change);root.removeEventListener('change',change);root.removeEventListener('submit',submit);root.removeEventListener('keydown',key);document.removeEventListener('pointerdown',outside);root.replaceChildren();}};
 }
